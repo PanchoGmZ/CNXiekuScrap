@@ -1,0 +1,191 @@
+{
+  "actorKeyValueStoreSchemaVersion": 1,
+  "title": "Estado y tiempos",
+  "collections": {
+    "runState": {
+      "title": "Estado",
+      "key": "RUN_STATE",
+      "contentTypes": [
+        "application/json"
+      ],
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cnxieku",
+              null
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "aborted",
+              "failed"
+            ]
+          },
+          "savedResults": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "resultStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "source",
+          "status",
+          "savedResults",
+          "resultStatus"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "timings": {
+      "title": "Tiempos",
+      "key": "TIMINGS",
+      "contentTypes": [
+        "application/json"
+      ],
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "type": "string",
+            "enum": [
+              "public-https",
+              "no-network"
+            ]
+          },
+          "mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "product",
+              "search",
+              null
+            ]
+          },
+          "requests": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "httpStatus": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "downloadMs": {
+                  "type": "number"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "httpStatus",
+                "downloadMs",
+                "errorCode"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "downloadMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "analysisMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "searchMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "jsonGenerationMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "requestedUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resultStatus": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial",
+              "not_found",
+              "blocked",
+              "timeout",
+              "error"
+            ]
+          },
+          "httpStatus": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "searchPerformed": {
+            "type": "boolean"
+          },
+          "totalMs": {
+            "type": "number"
+          },
+          "totalScope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "environment",
+          "mode",
+          "requests",
+          "downloadMs",
+          "analysisMs",
+          "searchMs",
+          "jsonGenerationMs",
+          "requestedUrl",
+          "resultStatus",
+          "httpStatus",
+          "searchPerformed",
+          "totalMs",
+          "totalScope"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

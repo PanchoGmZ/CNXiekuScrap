@@ -1,0 +1,16 @@
+node_modules
+storage
+apify_storage
+crawlee_storage
+.validation
+.git
+.github
+test
+.env
+.env.*
+**/*.pem
+**/*.key
+*.zip
+*.log
+AGENTS.md
+CLAUDE.md

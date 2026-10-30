@@ -1,0 +1,22 @@
+{
+  "$schema": "https://apify.com/schemas/v1/output.ide.json",
+  "actorOutputSchemaVersion": 1,
+  "title": "Resultados CNXieku",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "JSON guardado",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    },
+    "state": {
+      "type": "string",
+      "title": "Estado del resultado",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RUN_STATE"
+    },
+    "timings": {
+      "type": "string",
+      "title": "HTTP y tiempos",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/TIMINGS"
+    }
+  }
+}

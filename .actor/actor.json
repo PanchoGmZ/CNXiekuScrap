@@ -1,0 +1,19 @@
+{
+  "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+  "actorSpecification": 1,
+  "name": "scrapernuevo",
+  "title": "TU CUMPA — CNXieku",
+  "description": "Busca candidatos CNXieku o extrae una ficha real por URL en canonical o reference1688.",
+  "version": "0.0",
+  "meta": {
+    "templateId": "js-crawlee-cheerio",
+    "generatedBy": "OpenAI Codex with GPT-6"
+  },
+  "inputSchema": "./input_schema.json",
+  "outputSchema": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json",
+    "keyValueStore": "./key_value_store_schema.json"
+  },
+  "dockerfile": "../Dockerfile"
+}

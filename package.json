@@ -1,0 +1,30 @@
+{
+  "name": "scrapernuevo",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Actor JavaScript de CNXieku: búsqueda por palabra/código y extracción por URL con JSON 1688.",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "apify": "^3.7.0",
+    "@crawlee/cheerio": "^3.15.3"
+  },
+  "devDependencies": {
+    "@apify/eslint-config": "^2.0.0",
+    "eslint": "^9.29.0",
+    "eslint-config-prettier": "^10.1.5",
+    "prettier": "^3.5.3",
+    "vitest": "^5.0.0"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/main.js && node --check src/routes.js && node --check src/http.js"
+  },
+  "license": "ISC"
+}

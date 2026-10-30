@@ -1,0 +1,76 @@
+{
+  "$schema": "https://apify.com/schemas/v1/input.ide.json",
+  "title": "CNXieku: ficha o búsqueda",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "mode": {
+      "title": "Operación",
+      "type": "string",
+      "description": "product extrae una URL; search devuelve candidatos sin descargar sus fichas.",
+      "enum": [
+        "product",
+        "search"
+      ],
+      "default": "product"
+    },
+    "url": {
+      "title": "URL del producto",
+      "type": "string",
+      "description": "Solo product: https://www.cnxieku.com/item/ID, sin query ni fragmento. No enviar query/maxResults.",
+      "editor": "textfield",
+      "prefill": "https://www.cnxieku.com/item/20354"
+    },
+    "query": {
+      "title": "Palabra o código",
+      "type": "string",
+      "description": "Solo search: texto Unicode de 1 a 200 caracteres; no enviar url.",
+      "editor": "textfield",
+      "prefill": "1937"
+    },
+    "source": {
+      "title": "Fuente",
+      "type": "string",
+      "description": "Esta adaptación admite únicamente CNXieku.",
+      "enum": [
+        "cnxieku"
+      ],
+      "prefill": "cnxieku"
+    },
+    "maxResults": {
+      "title": "Máximo de candidatos",
+      "type": "integer",
+      "description": "Solo search, de 1 a 20. Si se omite, se devuelven hasta 10.",
+      "minimum": 1,
+      "maximum": 20,
+      "prefill": 10
+    },
+    "outputFormat": {
+      "title": "Formato de ficha",
+      "type": "string",
+      "description": "reference1688 tiene once campos. Search acepta canonical y devuelve su lista de candidatos.",
+      "enum": [
+        "canonical",
+        "reference1688"
+      ],
+      "default": "canonical"
+    },
+    "timeoutSecs": {
+      "title": "Plazo total (segundos)",
+      "type": "integer",
+      "description": "Un solo plazo para DNS y todos los GET de la operación, sin reintentos.",
+      "minimum": 1,
+      "maximum": 60,
+      "default": 30
+    },
+    "maxResponseBytes": {
+      "title": "Límite por respuesta",
+      "type": "integer",
+      "description": "Límite de bytes descargados, descomprimidos y texto UTF-8; máximo 2 MiB.",
+      "minimum": 1024,
+      "maximum": 2097152,
+      "default": 2097152
+    }
+  },
+  "required": []
+}
