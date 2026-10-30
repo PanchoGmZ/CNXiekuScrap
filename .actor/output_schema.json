@@ -5,9 +5,9 @@
   "properties": {
     "result": {
       "type": "string",
-      "title": "RESULT persistente — enlaces al JSON y al almacén",
-      "description": "RESULT_LOCATION contiene apiUrl y consoleUrl del registro RESULT en cnxieku-results. El registro se actualiza solo con resultados válidos; no es una copia por run.",
-      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RESULT_LOCATION"
+      "title": "JSON de esta ejecución",
+      "description": "Un único registro del Dataset predeterminado: metadatos y data. Los errores tienen estado de fallo, diagnóstico en data.error y terminan el run con exit 1.",
+      "template": "{{links.apiDefaultDatasetUrl}}/items?format=json"
     },
     "lastError": {
       "type": "string",
@@ -23,6 +23,12 @@
       "type": "string",
       "title": "HTTP y tiempos",
       "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/TIMINGS"
+    },
+    "persistentResult": {
+      "type": "string",
+      "title": "Último RESULT válido (referencia)",
+      "description": "RESULT_LOCATION enlaza a cnxieku-results/RESULT. Puede pertenecer a un run anterior si esta ejecución falló.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RESULT_LOCATION"
     }
   }
 }

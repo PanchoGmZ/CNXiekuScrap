@@ -1,93 +1,36 @@
 {
   "$schema": "https://apify.com/schemas/v1/input.ide.json",
-  "title": "CNXieku: buscar o extraer una ficha",
+  "title": "CNXieku: extraer un producto por URL",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "mode": {
-      "title": "Operación",
-      "type": "string",
-      "description": "Elige una operacion y completa solo su seccion. Deja vacios los campos de la otra; las combinaciones se rechazan antes de consultar CNXieku.",
-      "editor": "select",
-      "enum": [
-        "product",
-        "search"
-      ],
-      "enumTitles": [
-        "Extraer ficha por URL (product)",
-        "Buscar por palabra o codigo (search)"
-      ],
-      "default": "product"
-    },
     "url": {
-      "sectionCaption": "Ficha de producto - solo product",
-      "sectionDescription": "Completa URL y formato. Deja vacios Palabra o codigo y Maximo de candidatos.",
       "title": "URL del producto",
       "type": "string",
-      "description": "Solo product. Ejemplo: https://www.cnxieku.com/item/20354. Sin query ni fragmento. Obligatoria para product.",
+      "description": "URL CNXieku HTTPS de una ficha: https://www.cnxieku.com/item/<ID>, sin parámetros ni fragmento.",
       "editor": "textfield",
-      "prefill": ""
+      "prefill": "https://www.cnxieku.com/item/20354",
+      "pattern": "^https://www\\.cnxieku\\.com/item/[1-9][0-9]{0,19}$"
     },
     "outputFormat": {
-      "title": "Formato de la ficha",
+      "title": "Formato de salida",
       "type": "string",
-      "description": "En product, canonical guarda la ficha con estado y reference1688 conserva los once campos 1688 dentro de RESULT.data. En search deja canonical.",
+      "description": "canonical conserva la ficha, su estado y los campos faltantes dentro de data. reference1688 conserva los once campos compatibles con 1688 dentro de data.",
       "editor": "select",
       "enum": [
         "canonical",
         "reference1688"
       ],
       "enumTitles": [
-        "Ficha canonical / busqueda",
+        "Ficha canonical",
         "Ficha compatible con 1688"
       ],
       "default": "canonical"
-    },
-    "query": {
-      "sectionCaption": "Busqueda - solo search",
-      "sectionDescription": "Completa la palabra o codigo, deja URL vacia y conserva el formato canonical. No se descargan las fichas de los candidatos.",
-      "title": "Palabra o codigo",
-      "type": "string",
-      "description": "Solo search: 1-200 caracteres sin controles. Ejemplo: 1937. Obligatoria para search.",
-      "editor": "textfield",
-      "maxLength": 200,
-      "prefill": ""
-    },
-    "maxResults": {
-      "title": "Maximo de candidatos",
-      "type": "integer",
-      "description": "Solo search: de 1 a 20. Vacio usa 10 en busqueda. En product debe quedar vacio.",
-      "minimum": 1,
-      "maximum": 20,
-      "nullable": true,
-      "default": null
-    },
-    "timeoutSecs": {
-      "sectionCaption": "Limites comunes",
-      "title": "Plazo HTTP total (segundos)",
-      "type": "integer",
-      "description": "Un solo plazo para DNS y todos los GET de la operacion, sin reintentos.",
-      "minimum": 1,
-      "maximum": 60,
-      "default": 30
-    },
-    "maxResponseBytes": {
-      "title": "Limite por respuesta",
-      "type": "integer",
-      "description": "Limite de bytes descargados, descomprimidos y texto UTF-8; maximo 2 MiB.",
-      "minimum": 1024,
-      "maximum": 2097152,
-      "default": 2097152
-    },
-    "source": {
-      "title": "Fuente",
-      "type": "string",
-      "description": "Este Actor admite unicamente CNXieku.",
-      "editor": "hidden",
-      "pattern": "^cnxieku$",
-      "default": "cnxieku"
     }
   },
   "additionalProperties": false,
-  "required": []
+  "required": [
+    "url"
+  ],
+  "description": "Extrae una única ficha y guarda su JSON en el Dataset del run. El último resultado válido también se conserva en cnxieku-results/RESULT."
 }

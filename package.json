@@ -2,7 +2,7 @@
   "name": "scrapernuevo",
   "version": "0.0.1",
   "type": "module",
-  "description": "Actor JavaScript de CNXieku: búsqueda por palabra/código y extracción por URL con JSON 1688.",
+  "description": "Actor JavaScript de CNXieku: extracción por URL con JSON canonical o 1688 en Results.",
   "engines": {
     "node": ">=22"
   },

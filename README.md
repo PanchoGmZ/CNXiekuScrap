@@ -1,78 +1,43 @@
 # TU CUMPA — CNXieku
 
-Actor JavaScript: una ficha por URL o una búsqueda por palabra/código. Usa Apify
-SDK y Cheerio de la dependencia Crawlee ya instalada. No recorre el catálogo,
-no descarga imágenes ni fichas de los candidatos y no usa navegadores o proxies.
+Actor de extracción de un producto CNXieku por URL. Devuelve un único registro
+JSON en el Dataset predeterminado de cada run y conserva el último resultado
+válido en `cnxieku-results/RESULT`.
 
-## Instalación y acceso
+Usa Apify SDK y Cheerio de la dependencia Crawlee existente. Consulta la ficha
+real mediante HTTPS, sin navegador, proxy ni descarga de imágenes.
 
-Node.js 24 y Apify CLI. En una instalación nueva: `npm ci`. Producto y búsqueda
-intentan HTTP real por defecto:
+## Entrada
 
-```powershell
-apify run --no-purge --input-file input.product.json
+El formulario solicita únicamente la URL del producto y el formato de salida:
+
+```json
+{
+  "url": "https://www.cnxieku.com/item/20354",
+  "outputFormat": "reference1688"
+}
 ```
 
-El Actor de Cloud arranca con `node src/main.js` y no necesita `.env.local` ni
-credenciales del sitio. `.actorignore` limita el despliegue al código y los
-archivos necesarios para el build, excluyendo credenciales, diagnósticos y
-almacenamiento local. Los errores identifican DNS, TCP, TLS, HTTP o timeout.
+| Campo | Uso |
+| --- | --- |
+| `url` | Obligatorio. `https://www.cnxieku.com/item/<ID>`, sin parámetros ni fragmento. |
+| `outputFormat` | `canonical` (predeterminado) o `reference1688`. |
 
-## Ejecución
+Se rechazan los campos adicionales. Las entradas antiguas deben actualizarse a
+este contrato; ya no se admite `mode`, `query`, `maxResults` ni `source`.
 
-### Ejecutar desde Zed
+Los límites HTTP conservan sus valores predeterminados: plazo total de 30 s y
+2 MiB por respuesta. Se pueden ajustar mediante las variables de entorno
+`CNXIEKU_TIMEOUT_SECS` (entero de 1 a 60) y `CNXIEKU_MAX_RESPONSE_BYTES`
+(entero de 1024 a 2097152), sin añadir campos al formulario.
 
-Abrir `C:\Users\USUARIO\Desktop\scrapernuevo` como carpeta del proyecto en Zed.
-Editar `storage/key_value_stores/default/INPUT.json` para elegir `mode: "product"`
-o `mode: "search"`, con los campos del ejemplo correspondiente de abajo.
-Abrir la paleta con **Ctrl+Shift+P**, elegir **task: spawn**, seleccionar
-**Ejecutar CNXieku** y pulsar **Enter**. Para repetir, usar **task: rerun**
-en la misma paleta o el control de repeticion de la terminal de la tarea.
+## JSON de cada ejecución
 
-La tarea `.zed/tasks.json` guarda los archivos abiertos y ejecuta
-`node --env-file=.env.local src/main.js` desde la raiz del proyecto.
-`.env.local` es solo para configuracion local y sigue excluido del despliegue.
-La tarea fija el almacenamiento local en `./storage`, el INPUT y los
-almacenes `default`, desactiva la purga y deja vacios `APIFY_IS_AT_HOME` y
-`APIFY_TOKEN` para mantener el modo local. No hace falta ejecutar Apify CLI.
+El Actor llama una sola vez a `Actor.pushData()` para guardar el registro
+completo de la ejecución en su Dataset predeterminado. Las imágenes y variantes
+permanecen dentro de `data`; no se generan filas independientes para ellas.
 
-Los mensajes aparecen en la terminal de la tarea. El resultado local está en
-`storage/key_value_stores/cnxieku-results/RESULT.json`. Se reemplaza con cada
-resultado válido; no se agregan archivos numerados. Los diagnósticos del run
-quedan en `storage/key_value_stores/default/`.
-
-Como alternativa por terminal:
-
-```powershell
-apify run --no-purge --input-file input.product.json
-apify run --no-purge --input-file input.search.json
-```
-
-Ficha: `{"mode":"product","url":"https://www.cnxieku.com/item/20354","outputFormat":"reference1688"}`.
-Búsqueda: `{"mode":"search","source":"cnxieku","query":"1937","maxResults":10}`.
-Cambiar query por una palabra china u otro código. maxResults usa 10 por defecto,
-máximo 20. La búsqueda devuelve candidatos; elegir una URL requiere otro run product.
-No mezclar los campos de ambas operaciones. La URL de ficha no lleva query o fragmento.
-
-En el formulario de Apify, seleccionar **Operación** y completar solo su sección:
-`product` usa **URL del producto** y **Formato de la ficha**; `search` usa
-**Palabra o código**, **Máximo de candidatos** opcional y formato `canonical`.
-Dejar vacíos los campos del otro modo. Los campos vacíos se omiten antes de
-validar; los campos incompatibles con contenido producen `INVALID_INPUT` sin HTTP.
-El formulario admite selector y secciones, sin ocultación condicional documentada;
-no se usan `showIf` ni reglas incompatibles con el
-[esquema de entrada de Apify](https://docs.apify.com/actors/development/actor-definition/input-schema/specification/v1).
-
-`reference1688` conserva once campos: url, title, price, productLadderPrices, moq,
-weight, dimensions, images, characteristics, variations y productId. El formato
-canonical conserva estado, producto y campos faltantes. La búsqueda tiene un
-contrato de lista propio. No se inventan moneda, valores ausentes ni imágenes de SKU.
-
-## Resultado persistente
-
-El Key-Value Store nombrado **`cnxieku-results`**, registro **`RESULT`**, conserva
-un único resultado lógico entre runs. No se escriben productos en el dataset.
-La estructura común es:
+La estructura conserva los metadatos y el producto:
 
 ```json
 {
@@ -80,72 +45,126 @@ La estructura común es:
   "source": "cnxieku",
   "mode": "product",
   "outputFormat": "reference1688",
-  "status": "success",
+  "status": "partial",
   "updatedAt": "2026-10-30T12:00:00.000Z",
   "runId": "ID_DEL_RUN",
-  "data": {}
+  "data": {
+    "url": "https://www.cnxieku.com/item/20354",
+    "title": null,
+    "price": null,
+    "productLadderPrices": [],
+    "moq": null,
+    "weight": null,
+    "dimensions": null,
+    "images": null,
+    "characteristics": null,
+    "variations": null,
+    "productId": 20354
+  }
 }
 ```
 
-`data` contiene la ficha canonical completa, los once campos 1688 sin cambios,
-o la respuesta de búsqueda con `results`, según `mode` y `outputFormat`.
-`success` y `partial` reemplazan RESULT; una búsqueda válida sin candidatos
-también lo reemplaza. Errores de entrada, red, bloqueo o análisis conservan el
-último válido. Sin uno previo, RESULT aún no existe. `LAST_ERROR`, `RUN_STATE`
-y `TIMINGS` son diagnósticos de cada run, y los fallos terminan con exit 1.
+Este ejemplo ilustra el contrato; no representa una extracción real.
+`reference1688` conserva exactamente estos once campos dentro de `data`:
+`url`, `title`, `price`, `productLadderPrices`, `moq`, `weight`, `dimensions`,
+`images`, `characteristics`, `variations` y `productId`.
 
-En Apify: **Storage → Key-value stores → cnxieku-results → RESULT**.
-La salida del run **RESULT persistente** abre `RESULT_LOCATION`, con `apiUrl`
-para leer el JSON actual y `consoleUrl` para abrir el almacén. Se guarda solo
-la referencia por run, sin duplicar el producto. La API estable es
-`https://api.apify.com/v2/key-value-stores/<STORE_ID>/records/RESULT`;
-el almacén mantiene sus permisos privados habituales.
+Con `canonical`, `data` contiene `requestedUrl`, `source`, `mode`, `status`,
+`httpStatus`, `product`, `missingFields` y `error`. Los valores no disponibles
+permanecen como `null`; no se inventan moneda, precios escalonados ni imágenes
+de SKU. `partial` indica una extracción válida con campos faltantes.
 
-Una cola nombrada `cnxieku-results-writer`, con una sola solicitud de control,
-proporciona el bloqueo exclusivo en Cloud. Si otro run lo posee, la ejecución
-termina con `RESULT_BUSY`, sin HTTP ni cambios en RESULT. El bloqueo dura 300 s,
-se renueva antes de publicar y se libera al terminar o abortar; tras una caída
-expira automáticamente. Las escrituras tienen timeout de 15 s y no se reintentan.
-Localmente se usa un archivo de bloqueo exclusivo en `storage/`; si el proceso
-es terminado a la fuerza, quitarlo solo tras comprobar que no queda un run activo.
+Los esquemas de [Dataset](https://docs.apify.com/storage/dataset-schema) y
+[Output](https://docs.apify.com/actors/development/actor-definition/output-schema)
+están referenciados desde `.actor/actor.json`. La salida principal **JSON de
+esta ejecución** apunta directamente al Dataset del run, con el objeto `data`
+visible en la vista de Results/Output.
 
-Los tiempos excluyen init/exit del SDK y persistencia de diagnósticos. El CLI
-puede sustituir INPUT: respaldarlo si contiene configuración que se necesita.
+## Último resultado válido
 
-Límites: una solicitud por ficha, dos por búsqueda; cero redirecciones/reintentos;
-plazo total predeterminado 30 s (1–60), máximo 2 MiB por respuesta. Se validan URL,
-DNS público, IP remota y TLS. CAPTCHA, 403 y 429 detienen la operación. Un cambio de
-estructura Nuxt/API produce un error explícito, no resultados inventados.
+El Key-value Store nombrado **`cnxieku-results`**, registro **`RESULT`**, conserva
+el último producto válido entre runs. Un resultado `success` o `partial`
+reemplaza ese registro con el mismo objeto que se publica en el Dataset.
+Un error de entrada, red, bloqueo o análisis conserva el último válido.
 
-## Comprobación y Docker
+El Dataset pertenece al run actual. El registro persistente puede proceder de
+una ejecución anterior; nunca se copia ese resultado anterior al Dataset como
+si fuera una extracción nueva. Si aún no hubo un resultado válido, `RESULT`
+no existe.
 
-`npm run check`, `npm test`, `npm run lint` y `apify validate-schema`.
-Las pruebas locales son pequeñas y no hacen consultas públicas ni purgan datos.
+El bloqueo de escritura existente se mantiene: la cola nombrada
+`cnxieku-results-writer` permite un solo escritor en Cloud. Si otro run posee el
+bloqueo, se devuelve `RESULT_BUSY`, sin consultar la fuente ni cambiar `RESULT`.
+El bloqueo dura 300 s, se renueva antes de publicar y se libera al terminar o
+abortar; tras una caída expira automáticamente. Las escrituras persistentes
+tienen timeout de 15 s y no se reintentan.
+
+Se puede consultar el último válido en **Storage → Key-value stores →
+cnxieku-results → RESULT**. La salida secundaria **Último RESULT válido
+(referencia)** abre `RESULT_LOCATION`, con `apiUrl` y `consoleUrl` del almacén.
+El acceso conserva los permisos habituales del almacén.
+
+## Errores y diagnósticos
+
+Un fallo manejado genera una única fila con `status` igual a `not_found`,
+`blocked`, `timeout` o `error`. Incluso si se pidió `reference1688`, en ese caso
+`data` contiene el diagnóstico canonical: `data.error.code`,
+`data.error.message`, `data.httpStatus`, la URL validada y un producto vacío.
+El run termina con código 1; no se interpreta esa fila como un producto válido.
+
+En el Key-value Store predeterminado del run quedan:
+
+- `LAST_ERROR`: diagnóstico del fallo, cuando lo hay.
+- `RUN_STATE`: estado, `savedResults` (0 o 1 resultados válidos persistidos),
+  `datasetItems` (0 o 1 registros escritos) y estado de extracción.
+- `TIMINGS`: solicitudes HTTP, tiempos y estado de respuesta.
+- `RESULT_LOCATION`: referencia al almacén persistente.
+
+Un fallo del propio almacenamiento puede impedir publicar la fila o los
+diagnósticos; el run termina fallido y registra el error en sus logs. Si falla
+el Dataset después de guardar `RESULT`, ese último producto válido se conserva
+y el run permanece fallido. Una ejecución abortada persiste su estado y sale
+sin publicar resultados pendientes.
+
+Se conservan las validaciones de URL, DNS público, IP remota y TLS, junto con
+cero redirecciones y cero reintentos HTTP. CAPTCHA, 403 y 429 detienen la
+operación. Un cambio de estructura Nuxt produce un error explícito.
+
+## Verificar en Apify Cloud
+
+1. En el Actor existente conectado a GitHub, comprobar que el build de `main`
+   incluye el commit nuevo y finaliza correctamente. Si no se inició
+   automáticamente, lanzar el build desde la integración GitHub de ese Actor.
+2. Ejecutar ese build con una URL real y `outputFormat: "reference1688"`.
+3. Abrir **Runs → ejecución → Results/Output → JSON de esta ejecución**.
+   Debe aparecer un solo registro con los metadatos y los once campos en `data`.
+   Usar la vista JSON o la exportación JSON del Dataset para leer el objeto
+   completo. La respuesta del endpoint `/items?format=json` es un array con
+   ese único registro.
+4. Confirmar `status: "success"` o `"partial"`, `runId` del run actual y el
+   mismo objeto en `cnxieku-results/RESULT`.
+5. Ante un run fallido, revisar su fila de diagnóstico, logs y `LAST_ERROR`;
+   `RESULT` debe seguir conteniendo el último válido.
+
+Los archivos locales de `storage/` no se sincronizan con Console. Solo una
+ejecución en Cloud confirma el resultado del build publicado.
+
+## Desarrollo
+
+Node.js 24 y las dependencias existentes del proyecto. Para las comprobaciones
+rápidas de sintaxis y esquemas:
 
 ```powershell
-docker build --tag tucumpa-cnxieku:simple .
+npm run check
+apify validate-schema
 ```
 
-El contenedor ejecuta `node src/main.js`. Ejemplo local; cambiar el archivo
-de entrada para probar búsqueda:
+Para ejecutar localmente cuando se quiera comprobar una extracción real:
 
 ```powershell
-$store = Join-Path (Get-Location).Path ('storage/docker-' + [guid]::NewGuid().ToString('N'))
-$kv = Join-Path $store 'key_value_stores/default'
-New-Item -ItemType Directory -Path $kv -Force | Out-Null
-Copy-Item input.product.json (Join-Path $kv 'INPUT.json')
-docker run --rm --env APIFY_IS_AT_HOME= --env APIFY_TOKEN= --env CRAWLEE_STORAGE_DIR=/usr/src/app/storage --mount "type=bind,source=$store,target=/usr/src/app/storage" tucumpa-cnxieku:simple
+apify run --no-purge --input-file input.product.json
 ```
 
-APIFY_IS_AT_HOME y APIFY_TOKEN quedan vacíos; el primero no debe ser `0` porque
-el SDK interpreta cualquier cadena no vacía como modo plataforma. El nuevo
-Dockerfile se comprobó estáticamente; no se reconstruyó una imagen en esta adaptación.
-
-La extracción real de esta versión debe confirmarse en un run de Apify Cloud
-revisando el producto en `cnxieku-results/RESULT`, además del estado del run.
-
-Back Market permanece en el proyecto original y no se incorpora en esta adaptación.
-El despliegue en Apify se prepara conectando GitHub desde Console. Se conserva la licencia ISC y el identificador de plantilla
-Apify. Las dependencias de la plantilla se mantienen sin cambios de versiones;
-la cadena transitiva basic-ftp previamente reportada requiere revisión de seguridad
-antes de producción. El código consulta datos reales y no incluye resultados precargados.
+La publicación se realiza mediante la conexión GitHub del Actor existente.
+No es necesario ejecutar `apify push`. Se conservan Dockerfile, dependencias,
+licencia ISC y el mecanismo de persistencia y cancelación existente.

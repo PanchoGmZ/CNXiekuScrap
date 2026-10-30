@@ -4,14 +4,18 @@ import { it } from 'node:test';
 import { isPublicAddress, validateUrl } from '../src/http.js';
 import { export1688, parseInput } from '../src/routes.js';
 
-it('validates modes, numeric codes, Unicode and bounded inputs', () => {
-    assert.equal(parseInput({ mode: 'search', query: ' 1937 ' }).query, '1937');
-    assert.equal(parseInput({ mode: 'search', query: '跑步鞋 & 男鞋' }).maxResults, 10);
+it('accepts only a product URL and its output format', () => {
+    const url = 'https://www.cnxieku.com/item/20354';
+    assert.equal(parseInput({ url }).outputFormat, 'canonical');
+    assert.equal(parseInput({ url, outputFormat: 'reference1688' }).mode, 'product');
     for (const raw of [
+        {},
         { mode: 'search', query: '' },
         { mode: 'search', query: 'x', maxResults: 21 },
-        { url: 'https://www.cnxieku.com/item/20354', query: 'x' },
-        { url: ['https://www.cnxieku.com/item/20354'] },
+        { url, mode: 'product' },
+        { url, query: 'x' },
+        { url, outputFormat: 'unknown' },
+        { url: [url] },
     ])
         assert.throws(() => parseInput(raw));
 });

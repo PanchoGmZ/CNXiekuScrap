@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 
-import { createSession, hasControls, MAX_BYTES, ScrapeError, validateUrl } from './http.js';
+import { createSession, MAX_BYTES, ScrapeError, validateUrl } from './http.js';
 
 const { load } = createRequire(import.meta.resolve('@crawlee/cheerio'))('cheerio');
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -15,49 +15,20 @@ const id = (value) => {
 };
 export function parseInput(raw) {
     if (!record(raw)) throw new ScrapeError('INVALID_INPUT', 'La entrada debe ser un objeto JSON.');
-    // Optional fields left blank in the Console are not an operation selection.
-    raw = { ...raw };
-    for (const key of ['url', 'query', 'maxResults']) {
-        if (raw[key] === '' || raw[key] === null) delete raw[key];
-    }
-    const mode = raw.mode === undefined ? 'product' : raw.mode;
-    if (!['product', 'search'].includes(mode)) throw new ScrapeError('INVALID_MODE', 'mode debe ser product o search.');
-    const allowed = [
-        'mode',
-        'source',
-        'outputFormat',
-        'timeoutSecs',
-        'maxResponseBytes',
-        ...(mode === 'product' ? ['url'] : ['query', 'maxResults']),
-    ];
+    const allowed = ['url', 'outputFormat'];
     if (Object.keys(raw).some((key) => !allowed.includes(key)))
-        throw new ScrapeError('INVALID_INPUT', 'No mezclar URL y búsqueda ni enviar campos de crawling.');
-    if (raw.source !== undefined && raw.source !== 'cnxieku')
-        throw new ScrapeError('INVALID_SOURCE', 'Esta adaptación solo admite CNXieku.');
+        throw new ScrapeError('INVALID_INPUT', 'Solo se admiten url y outputFormat.');
     const outputFormat = raw.outputFormat === undefined ? 'canonical' : raw.outputFormat;
-    if (!['canonical', 'reference1688'].includes(outputFormat) || (mode === 'search' && outputFormat !== 'canonical')) {
-        throw new ScrapeError(
-            'INVALID_OUTPUT_FORMAT',
-            'reference1688 se reserva a fichas; search devuelve candidatos.',
-        );
+    if (!['canonical', 'reference1688'].includes(outputFormat)) {
+        throw new ScrapeError('INVALID_OUTPUT_FORMAT', 'outputFormat debe ser canonical o reference1688.');
     }
-    const timeoutSecs = raw.timeoutSecs === undefined ? 30 : raw.timeoutSecs;
-    const maxResponseBytes = raw.maxResponseBytes === undefined ? MAX_BYTES : raw.maxResponseBytes;
+    const timeoutSecs = Number(process.env.CNXIEKU_TIMEOUT_SECS ?? 30);
+    const maxResponseBytes = Number(process.env.CNXIEKU_MAX_RESPONSE_BYTES ?? MAX_BYTES);
     if (!Number.isInteger(timeoutSecs) || timeoutSecs < 1 || timeoutSecs > 60)
-        throw new ScrapeError('INVALID_TIMEOUT', 'timeoutSecs debe ser entero entre 1 y 60.');
+        throw new ScrapeError('INVALID_TIMEOUT', 'CNXIEKU_TIMEOUT_SECS debe ser entero entre 1 y 60.');
     if (!Number.isInteger(maxResponseBytes) || maxResponseBytes < 1024 || maxResponseBytes > MAX_BYTES)
-        throw new ScrapeError('INVALID_SIZE_LIMIT', 'maxResponseBytes debe estar entre 1024 y 2097152.');
-    const input = { mode, outputFormat, timeoutSecs, maxResponseBytes };
-    if (mode === 'product') input.url = validateUrl(raw.url).href;
-    else {
-        if (!text(raw.query) || Array.from(raw.query.trim()).length > 200 || hasControls(raw.query))
-            throw new ScrapeError('INVALID_QUERY', 'query requiere 1–200 caracteres de texto sin controles.');
-        input.query = raw.query.trim();
-        input.maxResults = raw.maxResults === undefined ? 10 : raw.maxResults;
-        if (!Number.isInteger(input.maxResults) || input.maxResults < 1 || input.maxResults > 20)
-            throw new ScrapeError('INVALID_MAX_RESULTS', 'maxResults debe ser entero entre 1 y 20.');
-    }
-    return input;
+        throw new ScrapeError('INVALID_SIZE_LIMIT', 'CNXIEKU_MAX_RESPONSE_BYTES debe estar entre 1024 y 2097152.');
+    return { mode: 'product', url: validateUrl(raw.url).href, outputFormat, timeoutSecs, maxResponseBytes };
 }
 function nuxt(html) {
     const scripts = load(html)('script#__NUXT_DATA__[type="application/json"][data-nuxt-data="nuxt-app"]');
@@ -161,72 +132,6 @@ export function extractProduct(html, sourceUrl) {
         productId,
     };
 }
-export function extractSearchPage(html, sourceUrl) {
-    const expected = validateUrl(sourceUrl, 'page');
-    const { root, field } = nuxt(html);
-    const path = text(field(root, 'path'));
-    let actual;
-    try {
-        actual = path ? new URL(path, expected.origin) : null;
-    } catch {
-        /* Refuse below. */
-    }
-    if (
-        !actual ||
-        actual.origin !== expected.origin ||
-        actual.pathname !== '/search/' ||
-        actual.searchParams.get('keyword') !== expected.searchParams.get('keyword') ||
-        actual.searchParams.get('searchType') !== '1'
-    ) {
-        throw new ScrapeError('SEARCH_PAGE_MISMATCH', 'La página Nuxt no corresponde a la búsqueda solicitada.');
-    }
-    const base = text(field(field(field(root, 'pinia'), 'common'), 'storageUrl'));
-    return imageUrl(base, null, true);
-}
-export function extractCandidates(body, maxResults, base) {
-    if (
-        !record(body) ||
-        body.code !== 0 ||
-        !record(body.data) ||
-        !Array.isArray(body.data.records) ||
-        body.data.records.length > 1000 ||
-        !Number.isSafeInteger(body.data.total) ||
-        body.data.total < 0
-    ) {
-        throw new ScrapeError('INVALID_SEARCH_DATA', 'La API no contiene el listado oficial esperado.');
-    }
-    const results = [];
-    const seen = new Set();
-    let skipped = 0;
-    for (const row of body.data.records) {
-        const productId = record(row) ? id(row.productId) : null;
-        const title = record(row) ? text(row.productName) : null;
-        if (!productId || !/^[1-9]\d{0,19}$/.test(productId) || !title) {
-            skipped++;
-            continue;
-        }
-        const url = validateUrl(`https://www.cnxieku.com/item/${productId}`).href;
-        if (seen.has(url)) continue;
-        seen.add(url);
-        const amount = number(row.productPrice);
-        results.push({
-            productId,
-            title,
-            url,
-            price: amount === null ? null : { amount, currency: null },
-            image: imageUrl(text(row.picThumb) ?? text(row.picUrl), base, true),
-            source: 'cnxieku',
-        });
-        if (results.length >= maxResults) break;
-    }
-    if ((!results.length && body.data.records.length) || (!body.data.records.length && body.data.total > 0)) {
-        throw new ScrapeError(
-            'INVALID_SEARCH_DATA',
-            'El listado no contiene candidatos verificables; no se interpreta como vacío.',
-        );
-    }
-    return { results, skipped };
-}
 function missingFields(value, path = '') {
     if (value === null) return [path];
     if (!value || typeof value !== 'object') return [];
@@ -283,7 +188,7 @@ function emptyProduct(url = null) {
         productId: null,
     };
 }
-export function failure(input, error, timings, modeHint) {
+export function failure(input, error, timings) {
     const known = error instanceof ScrapeError;
     const status = known ? error.status : 'error';
     const httpStatus = error?.httpStatus ?? timings.requests.at(-1)?.httpStatus ?? null;
@@ -292,19 +197,6 @@ export function failure(input, error, timings, modeHint) {
         message: known ? error.message : 'No se pudo analizar la respuesta.',
         retryAfter: error?.retryAfter ?? null,
     };
-    if ((input?.mode ?? modeHint) === 'search')
-        return {
-            mode: 'search',
-            source: 'cnxieku',
-            requestedUrl: timings.requestedUrl ?? null,
-            query: input?.query ?? null,
-            maxResults: input?.maxResults ?? null,
-            status,
-            searchPerformed: timings.requests.length > 0,
-            httpStatus,
-            results: [],
-            error: detail,
-        };
     const product = emptyProduct(input?.url ?? null);
     return {
         requestedUrl: input?.url ?? null,
@@ -351,62 +243,5 @@ export async function productRoute(input, signal, timings) {
         };
     } finally {
         Object.assign(timings, { analysisMs: performance.now() - started });
-    }
-}
-export async function searchRoute(input, signal, timings) {
-    const pageUrl = new URL('https://www.cnxieku.com/search/');
-    pageUrl.searchParams.set('keyword', input.query);
-    pageUrl.searchParams.set('searchType', '1');
-    const apiUrl = new URL('https://www.cnxieku.com/api/product/product/list');
-    for (const [key, value] of Object.entries({
-        page: '1',
-        size: String(input.maxResults),
-        keyword: input.query,
-        productType: '8',
-        sortType: '1',
-        shopId: '-1',
-    }))
-        apiUrl.searchParams.set(key, value);
-    Object.assign(timings, { requestedUrl: pageUrl.href });
-    const get = createSession(input, signal, timings);
-    const started = performance.now();
-    try {
-        const html = await get(pageUrl.href, 'page');
-        checkProtection(html);
-        let analysis = performance.now();
-        const base = extractSearchPage(html, pageUrl.href);
-        Object.assign(timings, { analysisMs: performance.now() - analysis });
-        const json = await get(apiUrl.href, 'api');
-        analysis = performance.now();
-        try {
-            let body;
-            try {
-                body = JSON.parse(json);
-            } catch {
-                throw new ScrapeError('INVALID_SEARCH_DATA', 'La API no devolvió JSON válido.');
-            }
-            if (record(body) && body.code !== 0) {
-                if ([401, 403, 429].includes(Number(body.code)))
-                    throw new ScrapeError('ACCESS_BLOCKED', 'La API rechazó el acceso; no se reintentó.', 'blocked');
-                throw new ScrapeError('SEARCH_API_ERROR', 'La API devolvió un error de negocio.');
-            }
-            const parsed = extractCandidates(body, input.maxResults, base);
-            return {
-                mode: 'search',
-                source: 'cnxieku',
-                requestedUrl: pageUrl.href,
-                query: input.query,
-                maxResults: input.maxResults,
-                status: parsed.skipped ? 'partial' : 'success',
-                searchPerformed: true,
-                httpStatus: timings.requests.at(-1).httpStatus,
-                results: parsed.results,
-                error: null,
-            };
-        } finally {
-            Object.assign(timings, { analysisMs: timings.analysisMs + performance.now() - analysis });
-        }
-    } finally {
-        Object.assign(timings, { searchMs: performance.now() - started });
     }
 }
