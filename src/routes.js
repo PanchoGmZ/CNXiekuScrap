@@ -15,6 +15,11 @@ const id = (value) => {
 };
 export function parseInput(raw) {
     if (!record(raw)) throw new ScrapeError('INVALID_INPUT', 'La entrada debe ser un objeto JSON.');
+    // Optional fields left blank in the Console are not an operation selection.
+    raw = { ...raw };
+    for (const key of ['url', 'query', 'maxResults']) {
+        if (raw[key] === '' || raw[key] === null) delete raw[key];
+    }
     const mode = raw.mode === undefined ? 'product' : raw.mode;
     if (!['product', 'search'].includes(mode)) throw new ScrapeError('INVALID_MODE', 'mode debe ser product o search.');
     const allowed = [

@@ -24,7 +24,7 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/main.js && node --check src/routes.js && node --check src/http.js"
+    "check": "node --check src/main.js && node --check src/routes.js && node --check src/http.js && node --check src/result-store.js"
   },
   "license": "ISC"
 }

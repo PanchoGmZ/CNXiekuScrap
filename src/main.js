@@ -1,6 +1,7 @@
 import { Actor, log } from 'apify';
 
 import { export1688, failure, parseInput, productRoute, searchRoute } from './routes.js';
+import { openResultStore } from './result-store.js';
 
 Actor.config.set('purgeOnStart', false);
 await Actor.init({ gracefulShutdown: false });
@@ -22,7 +23,7 @@ const persist = async () => {
         httpStatus: result?.httpStatus ?? null,
         searchPerformed: input?.mode === 'search' && timings.requests.length > 0,
         totalMs: performance.now() - started,
-        totalScope: 'Actor operation through dataset write; excludes SDK init/exit and report persistence',
+        totalScope: 'Actor operation through persistent RESULT write; excludes SDK init/exit and report persistence',
     });
     await Actor.setValue('RUN_STATE', { ...state });
 };
@@ -44,27 +45,56 @@ try {
         let raw;
         try {
             raw = await Actor.getInput();
+            const store = await openResultStore();
+            await Actor.setValue('RESULT_LOCATION', store.location);
             input = parseInput(raw);
-            const route = input.mode === 'search' ? searchRoute : productRoute;
-            result = await route(input, controller.signal, timings);
+            const writer = await store.acquire(controller.signal);
+            try {
+                const route = input.mode === 'search' ? searchRoute : productRoute;
+                result = await route(input, controller.signal, timings);
+                if (!result.error && ['success', 'partial'].includes(result.status) && !controller.signal.aborted) {
+                    const beforeJson = performance.now();
+                    const output =
+                        input.mode === 'product' && input.outputFormat === 'reference1688'
+                            ? export1688(result.product)
+                            : result;
+                    const json = JSON.stringify({
+                        schemaVersion: 1,
+                        source: 'cnxieku',
+                        mode: input.mode,
+                        outputFormat: input.outputFormat,
+                        status: result.status,
+                        updatedAt: new Date().toISOString(),
+                        runId: Actor.getEnv().actorRunId,
+                        data: output,
+                    });
+                    timings.jsonGenerationMs = performance.now() - beforeJson;
+                    await writer.write(JSON.parse(json));
+                    state.savedResults = 1;
+                }
+            } finally {
+                await writer.release();
+            }
         } catch (error) {
             result = failure(input, error, timings, raw?.mode);
         }
         state.source = result.source;
         state.resultStatus = result.status;
-        const beforeJson = performance.now();
-        const output =
-            input?.mode === 'product' && input.outputFormat === 'reference1688' && !result.error
-                ? export1688(result.product)
-                : result;
-        const json = JSON.stringify(output);
-        timings.jsonGenerationMs = performance.now() - beforeJson;
-        await Actor.pushData(JSON.parse(json));
-        state.savedResults = 1;
+        if (result.error) {
+            await Actor.setValue('LAST_ERROR', {
+                source: result.source,
+                mode: result.mode,
+                requestedUrl: result.requestedUrl,
+                status: result.status,
+                httpStatus: result.httpStatus,
+                error: result.error,
+            });
+            log.error('La ejecución falló; se conserva el último RESULT válido.', result.error);
+        }
     })();
     await task;
     if (!stopping) {
-        state.status = 'completed';
+        state.status = state.savedResults ? 'completed' : 'failed';
         await persist();
         if (!stopping) {
             log.info('CNXieku procesado.', {
@@ -73,7 +103,7 @@ try {
                 savedResults: state.savedResults,
             });
             Actor.off('aborting', onAbort);
-            await Actor.exit();
+            await Actor.exit({ exitCode: state.savedResults ? 0 : 1 });
         }
     }
 } catch (error) {

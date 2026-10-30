@@ -7,7 +7,7 @@
   "version": "0.0",
   "meta": {
     "templateId": "js-crawlee-cheerio",
-    "generatedBy": "Codex with GPT-6"
+    "generatedBy": "Codex with GPT-6.1-sol"
   },
   "inputSchema": "./input_schema.json",
   "outputSchema": "./output_schema.json",

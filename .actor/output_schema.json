@@ -3,10 +3,16 @@
   "actorOutputSchemaVersion": 1,
   "title": "Resultados CNXieku",
   "properties": {
-    "results": {
+    "result": {
       "type": "string",
-      "title": "JSON guardado",
-      "template": "{{links.apiDefaultDatasetUrl}}/items"
+      "title": "RESULT persistente — enlaces al JSON y al almacén",
+      "description": "RESULT_LOCATION contiene apiUrl y consoleUrl del registro RESULT en cnxieku-results. El registro se actualiza solo con resultados válidos; no es una copia por run.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RESULT_LOCATION"
+    },
+    "lastError": {
+      "type": "string",
+      "title": "Error de esta ejecución (solo si falló)",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/LAST_ERROR"
     },
     "state": {
       "type": "string",
