@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 
-import { isPublicAddress, requireAccess, validateUrl } from '../src/http.js';
+import { isPublicAddress, validateUrl } from '../src/http.js';
 import { export1688, parseInput } from '../src/routes.js';
 
 it('validates modes, numeric codes, Unicode and bounded inputs', () => {
@@ -28,25 +28,6 @@ it('restricts URLs and private addresses without any network calls', () => {
     for (const address of ['127.0.0.1', '10.0.0.1', '169.254.169.254', '::1', '2001:db8::1'])
         assert.equal(isPublicAddress(address), false);
     assert.equal(isPublicAddress('8.8.8.8'), true);
-});
-it('requires both declared search permissions before I/O', () => {
-    const previous = process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS;
-    try {
-        delete process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS;
-        assert.throws(() => requireAccess('product'));
-        process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS = JSON.stringify({
-            'www.cnxieku.com': {
-                permissionBasis: 'project-declared',
-                robotsException: true,
-                allowProductGet: true,
-            },
-        });
-        assert.doesNotThrow(() => requireAccess('product'));
-        assert.throws(() => requireAccess('search'));
-    } finally {
-        if (previous === undefined) delete process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS;
-        else process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS = previous;
-    }
 });
 it('exports eleven fields without inventing currency, tier prices or SKU pictures', () => {
     const product = {

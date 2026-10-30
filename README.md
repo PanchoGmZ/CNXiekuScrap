@@ -6,15 +6,17 @@ no descarga imágenes ni fichas de los candidatos y no usa navegadores o proxies
 
 ## Instalación y acceso
 
-Node.js 24 y Apify CLI. En una instalación nueva: `npm ci`. Cargar una declaración
-administrativa solo cuando la empresa confirme el alcance. El acuerdo empresarial
-comunicado no se ha revisado directamente. No se necesitan credenciales del sitio:
+Node.js 24 y Apify CLI. En una instalación nueva: `npm ci`. Producto y búsqueda
+intentan HTTP real por defecto:
 
 ```powershell
-$env:TU_CUMPA_SOURCE_AUTHORIZATIONS = '{"www.cnxieku.com":{"permissionBasis":"project-declared","agreementReviewed":false,"allowProductGet":true,"robotsException":true,"search":{"allowGet":true,"path":"/search/","searchType":"1","allowDataGet":true,"dataPath":"/api/product/product/list"}}}'
+apify run --no-purge --input-file input.product.json
 ```
 
-Sin esa variable el Actor devuelve `blocked` antes de consultar la fuente.
+El Actor de Cloud arranca con `node src/main.js` y no necesita `.env.local` ni
+credenciales del sitio. `.actorignore` limita el despliegue al código y los
+archivos necesarios para el build, excluyendo credenciales, diagnósticos y
+almacenamiento local. Los errores identifican DNS, TCP, TLS, HTTP o timeout.
 
 ## Ejecución
 
@@ -29,8 +31,8 @@ en la misma paleta o el control de repeticion de la terminal de la tarea.
 
 La tarea `.zed/tasks.json` guarda los archivos abiertos y ejecuta
 `node --env-file=.env.local src/main.js` desde la raiz del proyecto.
-`.env.local` aporta la autorizacion para ambos modos y sigue excluido de Git
-y Docker. La tarea fija el almacenamiento local en `./storage`, el INPUT y los
+`.env.local` es solo para configuracion local y sigue excluido del despliegue.
+La tarea fija el almacenamiento local en `./storage`, el INPUT y los
 almacenes `default`, desactiva la purga y deja vacios `APIFY_IS_AT_HOME` y
 `APIFY_TOKEN` para mantener el modo local. No hace falta ejecutar Apify CLI.
 
@@ -42,7 +44,7 @@ estar ignorados, usar **Ctrl+O** y pegar la ruta absoluta del JSON.
 Cada ejecucion guarda un registro; consultar tambien `RUN_STATE.json` en
 `storage/key_value_stores/default/` para comprobar el estado real del resultado.
 
-Como alternativa por terminal, con la autorizacion ya cargada:
+Como alternativa por terminal:
 
 ```powershell
 apify run --no-purge --input-file input.product.json
@@ -74,30 +76,29 @@ estructura Nuxt/API produce un error explícito, no resultados inventados.
 ## Comprobación y Docker
 
 `npm run check`, `npm test`, `npm run lint` y `apify validate-schema`.
-Las cuatro pruebas locales son pequeñas y no hacen consultas públicas ni purgan datos.
+Las pruebas locales son pequeñas y no hacen consultas públicas ni purgan datos.
 
 ```powershell
 docker build --tag tucumpa-cnxieku:simple .
 ```
 
-El contenedor ejecuta `node src/main.js`. Ejemplo local con la variable de
-acceso ya cargada; cambiar el archivo de entrada para probar búsqueda:
+El contenedor ejecuta `node src/main.js`. Ejemplo local; cambiar el archivo
+de entrada para probar búsqueda:
 
 ```powershell
 $store = Join-Path (Get-Location).Path ('storage/docker-' + [guid]::NewGuid().ToString('N'))
 $kv = Join-Path $store 'key_value_stores/default'
 New-Item -ItemType Directory -Path $kv -Force | Out-Null
 Copy-Item input.product.json (Join-Path $kv 'INPUT.json')
-docker run --rm --env APIFY_IS_AT_HOME= --env APIFY_TOKEN= --env TU_CUMPA_SOURCE_AUTHORIZATIONS --env CRAWLEE_STORAGE_DIR=/usr/src/app/storage --mount "type=bind,source=$store,target=/usr/src/app/storage" tucumpa-cnxieku:simple
+docker run --rm --env APIFY_IS_AT_HOME= --env APIFY_TOKEN= --env CRAWLEE_STORAGE_DIR=/usr/src/app/storage --mount "type=bind,source=$store,target=/usr/src/app/storage" tucumpa-cnxieku:simple
 ```
 
 APIFY_IS_AT_HOME y APIFY_TOKEN quedan vacíos; el primero no debe ser `0` porque
 el SDK interpreta cualquier cadena no vacía como modo plataforma. El nuevo
 Dockerfile se comprobó estáticamente; no se reconstruyó una imagen en esta adaptación.
 
-Validado el 29/10/2026 con HTTPS real: 20354 devolvió HTTP 200, 33 imágenes y 18
-variantes; búsqueda 1937 devolvió HTTP 200 en página/API y dos candidatos observados.
-Ambos JSON coincidieron íntegramente con los resultados públicos guardados anteriormente.
+La extracción real de esta versión debe confirmarse en un run de Apify Cloud
+revisando el producto guardado en el dataset, no solo el estado del run.
 
 Back Market permanece en el proyecto original y no se incorpora en esta adaptación.
 No hay despliegue ni push. Se conserva la licencia ISC y el identificador de plantilla

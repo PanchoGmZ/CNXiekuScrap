@@ -6,6 +6,8 @@ import { pipeline } from 'node:stream/promises';
 import { checkServerIdentity } from 'node:tls';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 
+import { log } from 'apify';
+
 export const MAX_BYTES = 2 * 1024 * 1024;
 export const hasControls = (value) =>
     Array.from(value).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
@@ -94,38 +96,8 @@ export function isPublicAddress(address) {
         !(prefix === 0x3fff && subnet <= 0xfff)
     );
 }
-export function requireAccess(mode) {
-    let grant;
-    try {
-        grant = JSON.parse(process.env.TU_CUMPA_SOURCE_AUTHORIZATIONS ?? '{}')['www.cnxieku.com'];
-    } catch {
-        throw new ScrapeError('INVALID_SOURCE_AUTHORIZATION', 'La declaración administrativa no es JSON válido.');
-    }
-    if (
-        grant?.permissionBasis !== 'project-declared' ||
-        grant.robotsException !== true ||
-        (mode === 'product' && grant.allowProductGet !== true)
-    ) {
-        throw new ScrapeError(
-            'SOURCE_NOT_AUTHORIZED',
-            'Falta la autorización declarada de CNXieku y su excepción de robots.',
-            'blocked',
-        );
-    }
-    if (
-        mode === 'search' &&
-        (grant.search?.allowGet !== true ||
-            grant.search.path !== '/search/' ||
-            grant.search.searchType !== '1' ||
-            grant.search.allowDataGet !== true ||
-            grant.search.dataPath !== '/api/product/product/list')
-    ) {
-        throw new ScrapeError(
-            'SEARCH_SCOPE_NOT_AUTHORIZED',
-            'La búsqueda requiere permiso declarado para la página y su API exacta.',
-            'blocked',
-        );
-    }
+function nativeCode(error) {
+    return typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code) ? error.code : null;
 }
 function cancelled(signal) {
     return signal.reason?.name === 'TimeoutError'
@@ -152,7 +124,9 @@ function publicDns(hostname, signal) {
         lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
             if (settled) return;
             if (error) {
-                finish(new ScrapeError('DNS_ERROR', 'No se pudo resolver CNXieku.'));
+                const code = nativeCode(error);
+                log.warning('Falló DNS de CNXieku.', { code, syscall: error.syscall ?? null });
+                finish(new ScrapeError('DNS_ERROR', `No se pudo resolver CNXieku${code ? ` (${code})` : ''}.`));
                 return;
             }
             if (
@@ -206,7 +180,6 @@ export function createSession(input, parentSignal, timings) {
     ) {
         throw new ScrapeError('INVALID_REQUEST_POLICY', 'La solicitud no cumple los límites de la operación.');
     }
-    requireAccess(input.mode); // Check both search permissions before any DNS/socket.
     const signal = AbortSignal.any([parentSignal, AbortSignal.timeout(input.timeoutSecs * 1000)]);
     const requestOrder = input.mode === 'search' ? ['page', 'api'] : ['product'];
     let count = 0;
@@ -222,15 +195,14 @@ export function createSession(input, parentSignal, timings) {
         timings.requests.push(report);
         try {
             if (signal.aborted) throw cancelled(signal);
-            requireAccess(input.mode);
             const [pin] = await publicDns(url.hostname, signal);
             if (signal.aborted) throw cancelled(signal);
-            requireAccess(input.mode);
             return await new Promise((resolve, reject) => {
                 let outgoing;
                 let incoming;
                 let settled = false;
                 let abort;
+                let phase = 'tcp';
                 const finish = (error, body) => {
                     if (settled) return;
                     settled = true;
@@ -249,11 +221,33 @@ export function createSession(input, parentSignal, timings) {
                         finish(error);
                         return;
                     }
-                    const tls = /CERT|TLS|SELF_SIGNED|UNABLE_TO_VERIFY/.test(error?.code ?? '');
+                    const code = nativeCode(error);
+                    log.warning('Falló el transporte HTTPS de CNXieku.', {
+                        phase,
+                        code,
+                        syscall: error?.syscall ?? null,
+                    });
+                    const tls = phase === 'tls' || /CERT|TLS|SSL|X509|SELF_SIGNED|UNABLE_TO_VERIFY/.test(code ?? '');
+                    const timeout = code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT';
+                    const category = timeout
+                        ? 'REQUEST_TIMEOUT'
+                        : tls
+                          ? 'TLS_ERROR'
+                          : phase === 'tcp'
+                            ? 'TCP_ERROR'
+                            : 'HTTP_ERROR';
+                    const message = timeout
+                        ? 'Se agotó el tiempo de conexión'
+                        : tls
+                          ? 'No se pudo completar o verificar TLS'
+                          : phase === 'tcp'
+                            ? 'No se pudo establecer la conexión TCP'
+                            : 'No se pudo completar la respuesta HTTP';
                     finish(
                         new ScrapeError(
-                            tls ? 'TLS_ERROR' : 'NETWORK_ERROR',
-                            tls ? 'No se pudo verificar TLS.' : 'La conexión HTTPS no pudo completarse.',
+                            category,
+                            `${message}${code ? ` (${code})` : ''}.`,
+                            timeout ? 'timeout' : 'error',
                         ),
                     );
                 };
@@ -406,6 +400,14 @@ export function createSession(input, parentSignal, timings) {
                         },
                     );
                     outgoing.on('error', fail);
+                    outgoing.on('socket', (socket) => {
+                        socket.once('connect', () => {
+                            phase = 'tls';
+                        });
+                        socket.once('secureConnect', () => {
+                            phase = 'http';
+                        });
+                    });
                     outgoing.on('upgrade', (_response, socket) => {
                         socket.destroy();
                         fail(new ScrapeError('UNEXPECTED_UPGRADE', 'Cambio de protocolo no permitido.'));

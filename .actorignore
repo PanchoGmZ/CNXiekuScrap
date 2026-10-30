@@ -1,0 +1,13 @@
+# Deploy only the Actor sources and build inputs.
+*
+!.actor/
+!.actor/**
+!src/
+!src/**
+!Dockerfile
+!package.json
+!package-lock.json
+!.npmrc
+!README.md
+!.dockerignore
+!.actorignore
